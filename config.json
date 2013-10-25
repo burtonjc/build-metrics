@@ -1,0 +1,24 @@
+{
+   "name": "BuildMetrics",
+   "className": "CustomApp",
+   "server": "https://rally1.rallydev.com",
+   "sdk": "2.0rc1",
+   "javascript": [
+      "javascripts/data/model/Metric.js",
+      "javascripts/data/store/Metric.js",
+      "javascripts/metric/AbstractMetric.js",
+      "javascripts/metric/BuildsCounted.js",
+      "javascripts/metric/GreenTimePerDay.js",
+      "javascripts/metric/JobSuccessRate.js",
+      "javascripts/metric/NewestBuild.js",
+      "javascripts/metric/OldestBuild.js",
+      "javascripts/metric/RedToGreenTime.js",
+      "javascripts/metric/TimeSinceRed.js",
+      "javascripts/controller/Metrics.js",
+      "javascripts/view/Metrics.js",
+      "javascripts/App.js"
+   ],
+   "css": [
+      "styles/app.css"
+   ]
+}

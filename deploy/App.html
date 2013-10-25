@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BuildMetrics</title>
+
+    <script type="text/javascript" src="/apps/2.0rc1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("data.model.Metric",{extend:"Ext.data.Model",fields:[{name:"name",type:"string"},{name:"data",type:"string"}]});
+                Ext.define("data.store.Metric",{model:"data.model.Metric",proxy:{type:"memory",reader:{type:"json"}}});
+                Ext.define("metric.AbstractMetric",{inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.BuildsCounted",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.GreenTimePerDay",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.JobSuccessRate",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.NewestBuild",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.OldestBuild",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.RedToGreen",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("metric.TimeSinceRed",{extend:"metric.AbstractMetric",inheritableStatics:{sample:function(){throw new Ext.Error(this.$className+"#sample() must be implemented!")},calculate:function(){throw new Ext.Error(this.$className+"#calculate() must be implemented!")}}});
+                Ext.define("controller.Metrics",{extend:"Deft.mvc.ViewController",init:function(){this.callParent(arguments)}});
+                Ext.define("view.Metrics",{extend:"Ext.grid.Panel",controller:"controller.Metrics",inject:["metricStore"],initComponent:function(){return Ext.applyIf(this,{itemId:"metricGrid",title:"Build Metrics",store:this.metricStore,columnLines:!0,columns:[{header:"Metric",dataIndex:"name"},{header:"Data",dataIndex:"data",flex:1}]}),this.callParent(arguments)}});
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",buildDefs:["/builddefinition/6880582633","/builddefinition/12178128372","/builddefinition/10399281081","/builddefinition/10399281167","/builddefinition/4654068723"],metrics:["metrics.BuildsCounted","metrics.GreenTimePerDay","metrics.JobSuccessRate","metrics.NewestBuild","metrics.OldestBuild","metrics.RedToGreenTime","metrics.TimeSinceRed"],launch:function(){Deft.Injector.configure({metricStore:"data.store.Metric"}),Ext.create("view.Metrics",{renderTo:Ext.getBody()})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"BuildMetrics",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        .app {
+     /* Add app styles here */
+}
+
+    </style>
+</head>
+<body></body>
+</html>
