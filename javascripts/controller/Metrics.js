@@ -34,6 +34,7 @@ Ext.define('controller.Metrics', {
 
     init: function() {
         this.callParent(arguments);
+        this.getView().setLoading(true);
         var buildStore = this.getBuildStore();
         buildStore.filter([
             this.filterByTime(),
@@ -71,6 +72,8 @@ Ext.define('controller.Metrics', {
                 data: metric.calculate()
             }));
         }, this);
+
+        this.getView().setLoading(false);
     }
 
 });

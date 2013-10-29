@@ -13,6 +13,7 @@ Ext.define('view.Metrics', {
             itemId: 'metricGrid',
             title: 'Build Metrics',
             store: this.getMetricStore(),
+            minHeight: 200,
 
             columns: [{
                 header: 'Metric',
