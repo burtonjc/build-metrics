@@ -9,7 +9,7 @@ Ext.define('metric.BuildsCounted', {
     },
 
     doSample: function(build) {
-        var buildDefinitionName = this.buildDefinitionNameFor(build);
+        var buildDefinitionName = util.Build.buildDefinitionNameFor(build);
         this.getBuilds()[buildDefinitionName] = (this.getBuilds()[buildDefinitionName] || 0) + 1;
     },
 

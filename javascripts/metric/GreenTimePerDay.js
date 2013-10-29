@@ -12,16 +12,16 @@ Ext.define('metric.GreenTimePerDay', {
     },
 
     doSample: function(build) {
-        var buildName = this.buildDefinitionNameFor(build);
+        var buildName = util.Build.buildDefinitionNameFor(build);
         if(this.hasAllBuilds(this.getBuilds())) {
             this.addDay(build);
-            var previouslyPassing = this.allPassing(this.getBuilds());
+            var previouslyPassing = util.Build.allPassing(this.getBuilds());
             this.getBuilds()[buildName] = build;
             if(this.hasPassed) {
-                if(previouslyPassing && this.isFailing(build)) {
-                    this.redStart = this.endTime(build);
-                } else if(!previouslyPassing && this.allPassing(this.getBuilds())) {
-                    var buildEnded = this.endTime(build);
+                if(previouslyPassing && util.Build.isFailing(build)) {
+                    this.redStart = util.Build.endTime(build);
+                } else if(!previouslyPassing && util.Build.allPassing(this.getBuilds())) {
+                    var buildEnded = util.Build.endTime(build);
                     if(this.withinWorkingHours(this.redStart) || this.withinWorkingHours(buildEnded)) {
                         this.diffs.push(this.adjustEndTime(buildEnded) - this.adjustStartTime(this.redStart));
                     }
@@ -89,7 +89,7 @@ Ext.define('metric.GreenTimePerDay', {
     },
 
     addDay: function(build) {
-        var day = new Date(this.endTime(build)).toDateString();
+        var day = new Date(util.Build.endTime(build)).toDateString();
         if(this.days.indexOf(day) == -1) {
             this.days.push(day);
         }

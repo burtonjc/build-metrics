@@ -10,7 +10,7 @@ Ext.define('metric.NewestBuild', {
 
     calculate: function() {
         var build = this.newest;
-        return this.buildDefinitionNameFor(build) + " " + build.get('Number') + " (Started " + new Date(this.startTime(build)).toString() + ")";
+        return util.Build.buildDefinitionNameFor(build) + " " + build.get('Number') + " (Started " + new Date(util.Build.startTime(build)).toString() + ")";
     }
 
 });

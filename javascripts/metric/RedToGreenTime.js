@@ -11,15 +11,15 @@ Ext.define('metric.RedToGreenTime', {
     },
 
     doSample: function(build) {
-        var buildName = this.buildDefinitionNameFor(build);
+        var buildName = util.Build.buildDefinitionNameFor(build);
         if(this.hasAllBuilds(this.builds)) {
-            var previouslyPassing = this.allPassing(this.builds);
+            var previouslyPassing = util.Build.allPassing(this.builds);
             this.builds[buildName] = build;
             if(this.hasPassed) {
-                if(previouslyPassing && this.isFailing(build)) {
-                    this.redStart = this.endTime(build);
-                } else if(!previouslyPassing && this.allPassing(this.builds)) {
-                    this.diffs.push(this.endTime(build) - this.redStart);
+                if(previouslyPassing && util.Build.isFailing(build)) {
+                    this.redStart = util.Build.endTime(build);
+                } else if(!previouslyPassing && util.Build.allPassing(this.builds)) {
+                    this.diffs.push(util.Build.endTime(build) - this.redStart);
                 }
             }
             if(previouslyPassing) { this.hasPassed = true; }

@@ -2,7 +2,8 @@ Ext.define('metric.AbstractMetric', {
 
     config: {
         builds: {},
-        buildDefinitions: []
+        buildDefinitions: [],
+        buildUtils: null
     },
 
     sample: function(builds) {
@@ -25,28 +26,6 @@ Ext.define('metric.AbstractMetric', {
         }
     },
 
-    buildDefinitionNameFor: function(build) {
-        return build.get('BuildDefinition')._refObjectName;
-    },
-
-    startTime: function(build) {
-        var buildTime = Date.parse(build.get('Start'));
-        var correctedTime = buildTime + (new Date().getTimezoneOffset()*60*1000);
-        return correctedTime;
-    },
-
-    endTime: function(build) {
-        return this.startTime(build) + (build.get('Duration') * 1000);
-    },
-
-    isPassing: function(build) {
-        return build && build.get('Status') === 'SUCCESS';
-    },
-
-    isFailing: function(build) {
-        return !this.isPassing(build);
-    },
-
     pluralize: function(val, num) {
         if(num != 1) { val += 's'; }
         return ' ' + num + ' ' + val;
@@ -63,22 +42,8 @@ Ext.define('metric.AbstractMetric', {
         return result;
     },
 
-    values: function(builds, callback) {
-        var results = [];
-        for(buildName in builds) {
-            var build = builds[buildName];
-            results.push(callback(build));
-        }
-        return results;
-    },
-
-    allPassing: function(builds) {
-      return Math.min.apply(this, this.values(builds, this.isPassing));
-    },
-
     hasAllBuilds: function(builds) {
-        var statusArray = this.values(builds, this.isPassing);
-        return statusArray.length == this.getBuildDefinitions().length;
+        return _.keys(builds).length == this.getBuildDefinitions().length;
     }
 
 });

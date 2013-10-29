@@ -7,15 +7,47 @@
 
     <script type="text/javascript">
         Rally.onReady(function () {
+                Ext.define('util.Build', {
+    singleton: true,
+
+    buildDefinitionNameFor: function(build) {
+        return build.get('BuildDefinition')._refObjectName;
+    },
+
+    startTime: function(build) {
+        var buildTime = Date.parse(build.get('Start')),
+            timeZoneOffset = new Date().getTimezoneOffset() * 60 * 1000,
+            correctedTime = buildTime + timeZoneOffset;
+        return correctedTime;
+    },
+
+    endTime: function(build) {
+        return this.startTime(build) + (build.get('Duration') * 1000);
+    },
+
+    isPassing: function(build) {
+        return build && build.get('Status') === 'SUCCESS';
+    },
+
+    isFailing: function(build) {
+        return !this.isPassing(build);
+    },
+
+    allPassing: function(builds) {
+        return _.all(builds, this.isPassing);
+    }
+});
+
                 Ext.define('data.model.Metric', {
     extend: 'Ext.data.Model',
     fields: [
-        {name: 'name',  type: 'string'},
+        {name: 'description',  type: 'string'},
         {name: 'data',   type: 'string'}
     ]
 });
 
                 Ext.define('data.store.Metric', {
+    extend: 'Ext.data.Store',
     model: 'data.model.Metric',
     proxy: {
         type: 'memory',
@@ -26,14 +58,51 @@
 });
 
                 Ext.define('metric.AbstractMetric', {
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    config: {
+        builds: {},
+        buildDefinitions: [],
+        buildUtils: null
+    },
+
+    sample: function(builds) {
+        _.forEach(builds, this.doSample, this);
+    },
+
+    doSample: function(build) {
+        throw new Ext.Error(this.$className + "#doSample() must be implemented!");
+    },
+
+    calculate: function() {
+        throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    },
+
+    getDescription: function() {
+        if (this.description) {
+            return this.description;
+        } else {
+            throw new Ext.Error(this.$className + "#description must not be null");
         }
+    },
+
+    pluralize: function(val, num) {
+        if(num != 1) { val += 's'; }
+        return ' ' + num + ' ' + val;
+    },
+
+    formatDiff: function(diff) {
+        var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        var hours = Math.floor(diff / (1000 * 60 * 60)) % 24;
+        var minutes = Math.floor(diff / (1000 * 60)) % 60;
+        var result = '';
+        result += (days > 0) ? this.pluralize('day', days) + ", " : "";
+        result += (hours > 0) ? this.pluralize('hour', hours) + ", " : "";
+        result += (minutes > 0) ? this.pluralize('minute', minutes) : "";
+        return result;
+    },
+
+    hasAllBuilds: function(builds) {
+        return _.keys(builds).length == this.getBuildDefinitions().length;
     }
 
 });
@@ -41,14 +110,23 @@
                 Ext.define('metric.BuildsCounted', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'These metrics include:',
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
-        }
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent(arguments);
+    },
+
+    doSample: function(build) {
+        var buildDefinitionName = util.Build.buildDefinitionNameFor(build);
+        this.getBuilds()[buildDefinitionName] = (this.getBuilds()[buildDefinitionName] || 0) + 1;
+    },
+
+    calculate: function() {
+        return _.reduce(this.getBuilds(), function(message, buildCount, buildName) {
+            message.push(buildCount + ' runs of ' + buildName);
+            return message;
+        }, []).join('<br />');
     }
 
 });
@@ -56,29 +134,139 @@
                 Ext.define('metric.GreenTimePerDay', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'On average from 6AM to 6PM Mountain time, the light is green for:',
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    days: [],
+    diffs: [],
+
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent(arguments);
+    },
+
+    doSample: function(build) {
+        var buildName = util.Build.buildDefinitionNameFor(build);
+        if(this.hasAllBuilds(this.getBuilds())) {
+            this.addDay(build);
+            var previouslyPassing = util.Build.allPassing(this.getBuilds());
+            this.getBuilds()[buildName] = build;
+            if(this.hasPassed) {
+                if(previouslyPassing && util.Build.isFailing(build)) {
+                    this.redStart = util.Build.endTime(build);
+                } else if(!previouslyPassing && util.Build.allPassing(this.getBuilds())) {
+                    var buildEnded = util.Build.endTime(build);
+                    if(this.withinWorkingHours(this.redStart) || this.withinWorkingHours(buildEnded)) {
+                        this.diffs.push(this.adjustEndTime(buildEnded) - this.adjustStartTime(this.redStart));
+                    }
+                }
+            }
+            if(previouslyPassing) { this.hasPassed = true; }
+        } else {
+            this.getBuilds()[buildName] = build;
         }
-    }
+    },
+
+    calculate: function() {
+        var numberOfDays = this.days.length,
+            totalMillis = numberOfDays * 12 * 60 * 60 * 1000;
+        for(var i = 0; i < numberOfDays; i++) {
+            totalMillis -= isNaN(this.diffs[i]) ? 0 : this.diffs[i];
+        }
+        return this.formatDiff(totalMillis / numberOfDays) + " per day (" + numberOfDays + " days of data)";
+    },
+
+    withinWorkingHours: function(time) {
+        var date = new Date(time),
+        hour = date.getHours()
+        day = date.getDay();
+        // 6:00 AM to 5:59:59 PM
+        return hour > 5 && hour < 18;
+    },
+
+    adjustTime: function(time, min, sec, mil) {
+        var d = new Date(time);
+        d.setMinutes(min);
+        d.setSeconds(sec);
+        d.setMilliseconds(mil);
+        return d;
+    },
+
+    adjustStartTime: function(time) {
+        if(this.withinWorkingHours(time)) {
+            return time;
+        }
+
+        var start = this.adjustTime(time, 0, 0, 0),
+            hour = start.getHours();
+        if(hour > 17) {
+            start = start + ((30 - hour) * 60 * 60 * 1000);
+        } else {
+            start = start + ((6 - hour) * 60 * 60 * 1000);
+        }
+        return start;
+    },
+
+    adjustEndTime: function(time) {
+        if(this.withinWorkingHours(time)) {
+            return time;
+        }
+
+        var end = this.adjustTime(time, 59, 59, 999),
+            hour = end.getHours();
+        if(hour > 17) {
+            end = end - ((hour - 17) * 60 * 60 * 1000);
+        } else {
+            end = end - ((34 - hour) * 60 * 60 * 1000);
+        }
+        return end;
+    },
+
+    addDay: function(build) {
+        var day = new Date(util.Build.endTime(build)).toDateString();
+        if(this.days.indexOf(day) == -1) {
+            this.days.push(day);
+        }
+    },
 
 });
 
                 Ext.define('metric.JobSuccessRate', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'Build success rate:',
+    builds: {},
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent(arguments);
+    },
+
+    doSample: function(build) {
+        var buildDefinitionName = util.Build.buildDefinitionNameFor(build);
+
+        if (!this.builds[buildDefinitionName]) {
+            this.builds[buildDefinitionName] = {
+                count: 0,
+                success: 0
+            };
         }
+        this.builds[buildDefinitionName].count++;
+
+        if (util.Build.isPassing(build)) {
+            this.builds[buildDefinitionName].success += 1;
+        }
+    },
+
+    calculate: function() {
+        var message,
+            stats;
+
+        return _.reduce(this.builds, function(result, value, key) {
+            stats = this.builds[key];
+            message = (Math.round(10000 * stats.success / stats.count)/100) + '% success for ' + key;
+            result.push(message);
+            return result;
+        }, [], this).join("<br />");
     }
 
 });
@@ -86,14 +274,16 @@
                 Ext.define('metric.NewestBuild', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'The newest build in these metrics is: ',
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
-        }
+    doSample: function(build) {
+        //sorted oldest to newest, so last one will be the newest
+        this.newest = build;
+    },
+
+    calculate: function() {
+        var build = this.newest;
+        return util.Build.buildDefinitionNameFor(build) + " " + build.get('Number') + " (Started " + new Date(util.Build.startTime(build)).toString() + ")";
     }
 
 });
@@ -101,29 +291,60 @@
                 Ext.define('metric.OldestBuild', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'The oldest build in these metrics is:',
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
-        }
+    doSample: function(build) {
+        if(this.oldestBuild) { return; }
+        this.oldestBuild = build;
+    },
+
+    calculate: function() {
+        return [
+            util.Build.buildDefinitionNameFor(this.oldestBuild),
+            this.oldestBuild.get('Number'),
+            "(Started",
+            new Date(this.oldestBuild.get('Start')).toString() + ")"
+        ].join(" ");
     }
 
 });
 
-                Ext.define('metric.RedToGreen', {
+                Ext.define('metric.RedToGreenTime', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'When the light goes red, the average time before a green light is:',
+    builds: {},
+    diffs:[],
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent(arguments);
+    },
+
+    doSample: function(build) {
+        var buildName = util.Build.buildDefinitionNameFor(build);
+        if(this.hasAllBuilds(this.builds)) {
+            var previouslyPassing = util.Build.allPassing(this.builds);
+            this.builds[buildName] = build;
+            if(this.hasPassed) {
+                if(previouslyPassing && util.Build.isFailing(build)) {
+                    this.redStart = util.Build.endTime(build);
+                } else if(!previouslyPassing && util.Build.allPassing(this.builds)) {
+                    this.diffs.push(util.Build.endTime(build) - this.redStart);
+                }
+            }
+            if(previouslyPassing) { this.hasPassed = true; }
         }
+        this.builds[buildName] = build;
+    },
+
+    calculate: function() {
+        var count = this.diffs.length,
+            average = 0;
+        for(var i = 0; i < count; i++) {
+            average += (this.diffs[i] / count);
+        }
+        return this.formatDiff(average) + " (there were " + count + " red lights in this data)";
     }
 
 });
@@ -131,41 +352,133 @@
                 Ext.define('metric.TimeSinceRed', {
     extend: 'metric.AbstractMetric',
 
-    inheritableStatics: {
-        sample: function() {
-            throw new Ext.Error(this.$className + "#sample() must be implemented!");
-        },
+    description: 'The light has been green for:',
+    builds: {},
 
-        calculate: function() {
-            throw new Ext.Error(this.$className + "#calculate() must be implemented!");
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent(arguments);
+    },
+
+    doSample: function(build) {
+        var defName = util.Build.buildDefinitionNameFor(build);
+        if(util.Build.isPassing(build)) {
+            var lastBuild = this.builds[defName];
+            if(lastBuild && util.Build.isPassing(lastBuild)) { return; }
+        }
+        this.builds[defName] = build;
+    },
+
+    calculate: function() {
+        if(util.Build.allPassing(this.builds)) {
+            var endTimes = values(this.builds, endTime),
+                lastBuildEnded = Math.max.apply(this, endTimes);
+                diff = new Date() - lastBuildEnded;
+            return this.formatDiff(diff);
+        } else {
+            return "Currently Red";
         }
     }
 
 });
 
                 Ext.define('controller.Metrics', {
-    extend: "Deft.mvc.ViewController",
+    extend: 'Deft.mvc.ViewController',
+    inject: ['metricStore', 'buildStore'],
+
+    config: {
+        metricStore: null,
+        buildStore: null
+    },
+
+    observe: {
+        buildStore: {
+            load: 'onBuildStoreLoad'
+        }
+    },
+
+    buildDefinitions: [
+        // '/builddefinition/14104398785' // alm
+        '/builddefinition/6880582633', // master-alm-continuous-java
+        '/builddefinition/12178128372', // master-alm-continuous-guitest
+        '/builddefinition/10399281081',  // master-alm-continuous-js-chrome
+        '/builddefinition/10399281167', // master-alm-continuous-js-firefox
+        '/builddefinition/4654068723' // master-flaky-finder-continuous
+    ],
+
+    metrics: [
+        'metric.BuildsCounted',
+        'metric.GreenTimePerDay',
+        'metric.JobSuccessRate',
+        'metric.NewestBuild',
+        'metric.OldestBuild',
+        'metric.RedToGreenTime',
+        'metric.TimeSinceRed'
+    ],
 
     init: function() {
         this.callParent(arguments);
+        var buildStore = this.getBuildStore();
+        buildStore.filter([
+            this.filterByTime(),
+            this.filterByBuildDefinition()
+        ]);
+    },
+
+    filterByTime: function() {
+        var startTime = Ext.Date.format(Ext.Date.add(new Date(), Ext.Date.DAY, -14), 'Y-m-d');
+
+        return Ext.create('Rally.data.QueryFilter', {
+            property: 'Start',
+            operator: '>',
+            value: startTime
+        })
+    },
+
+    filterByBuildDefinition: function() {
+        return _.reduce(this.buildDefinitions, function(filter, buildDefinition) {
+            var filterCondition = Ext.create('Rally.data.QueryFilter', {
+                property: 'BuildDefinition',
+                value: buildDefinition
+            });
+            return filter ? filter.or(filterCondition) : filterCondition;
+        }, null);
+    },
+
+    onBuildStoreLoad: function(store, records, successful) {
+        _.forEach(this.metrics, function(metric) {
+            metric = Ext.create(metric, {buildDefinitions: this.buildDefinitions});
+            metric.sample(records);
+
+            this.getMetricStore().add(Ext.create('data.model.Metric', {
+                description: metric.getDescription(),
+                data: metric.calculate()
+            }));
+        }, this);
     }
+
 });
 
                 Ext.define('view.Metrics', {
     extend: 'Ext.grid.Panel',
+    alias: 'widget.metricsview',
     controller: 'controller.Metrics',
     inject: ['metricStore'],
+
+    config: {
+        metricStore: null
+    },
 
     initComponent: function() {
         Ext.applyIf(this, {
             itemId: 'metricGrid',
             title: 'Build Metrics',
-            store: this.metricStore,
-            columnLines: true,
+            store: this.getMetricStore(),
 
             columns: [{
                 header: 'Metric',
-                dataIndex: 'name'
+                dataIndex: 'description',
+                width: '350px'
             },{
                 header: 'Data',
                 dataIndex: 'data',
@@ -181,34 +494,21 @@
     extend: 'Rally.app.App',
     componentCls: 'app',
 
-    buildDefs: [
-        // '/builddefinition/14104398785' // alm
-        '/builddefinition/6880582633', // master-alm-continuous-java
-        '/builddefinition/12178128372', // master-alm-continuous-guitest
-        '/builddefinition/10399281081',  // master-alm-continuous-js-chrome
-        '/builddefinition/10399281167', // master-alm-continuous-js-firefox
-        '/builddefinition/4654068723' // master-flaky-finder-continuous
-    ],
-
-    metrics: [
-        'metrics.BuildsCounted',
-        'metrics.GreenTimePerDay',
-        'metrics.JobSuccessRate',
-        'metrics.NewestBuild',
-        'metrics.OldestBuild',
-        'metrics.RedToGreenTime',
-        'metrics.TimeSinceRed'
-    ],
-
     launch: function() {
         Deft.Injector.configure({
-            metricStore: "data.store.Metric"
+            metricStore: "data.store.Metric",
+            buildStore: {
+                className: 'Rally.data.WsapiDataStore',
+                parameters: [{
+                    model: 'Build',
+                    fetch: true,
+                    limit: Infinity
+                }]
+            }
         });
 
-        Ext.create('view.Metrics', {
-            renderTo: Ext.getBody()
-        });
-    }
+        this.add({xtype: 'metricsview'});
+    },
 });
 
 

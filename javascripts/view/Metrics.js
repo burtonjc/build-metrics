@@ -12,12 +12,12 @@ Ext.define('view.Metrics', {
         Ext.applyIf(this, {
             itemId: 'metricGrid',
             title: 'Build Metrics',
-            store: this.metricStore,
+            store: this.getMetricStore(),
 
             columns: [{
                 header: 'Metric',
                 dataIndex: 'description',
-                width: '200px'
+                width: '350px'
             },{
                 header: 'Data',
                 dataIndex: 'data',

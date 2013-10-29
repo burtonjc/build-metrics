@@ -10,7 +10,7 @@ Ext.define('metric.OldestBuild', {
 
     calculate: function() {
         return [
-            this.buildDefinitionNameFor(this.oldestBuild),
+            util.Build.buildDefinitionNameFor(this.oldestBuild),
             this.oldestBuild.get('Number'),
             "(Started",
             new Date(this.oldestBuild.get('Start')).toString() + ")"

@@ -10,7 +10,7 @@ Ext.define('metric.JobSuccessRate', {
     },
 
     doSample: function(build) {
-        var buildDefinitionName = this.buildDefinitionNameFor(build);
+        var buildDefinitionName = util.Build.buildDefinitionNameFor(build);
 
         if (!this.builds[buildDefinitionName]) {
             this.builds[buildDefinitionName] = {
@@ -20,7 +20,7 @@ Ext.define('metric.JobSuccessRate', {
         }
         this.builds[buildDefinitionName].count++;
 
-        if (this.isPassing(build)) {
+        if (util.Build.isPassing(build)) {
             this.builds[buildDefinitionName].success += 1;
         }
     },

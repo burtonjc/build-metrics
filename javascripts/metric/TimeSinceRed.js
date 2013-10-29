@@ -10,16 +10,16 @@ Ext.define('metric.TimeSinceRed', {
     },
 
     doSample: function(build) {
-        var defName = this.buildDefinitionNameFor(build);
-        if(this.isPassing(build)) {
+        var defName = util.Build.buildDefinitionNameFor(build);
+        if(util.Build.isPassing(build)) {
             var lastBuild = this.builds[defName];
-            if(lastBuild && this.isPassing(lastBuild)) { return; }
+            if(lastBuild && util.Build.isPassing(lastBuild)) { return; }
         }
         this.builds[defName] = build;
     },
 
     calculate: function() {
-        if(this.allPassing(this.builds)) {
+        if(util.Build.allPassing(this.builds)) {
             var endTimes = values(this.builds, endTime),
                 lastBuildEnded = Math.max.apply(this, endTimes);
                 diff = new Date() - lastBuildEnded;

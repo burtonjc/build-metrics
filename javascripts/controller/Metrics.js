@@ -64,7 +64,7 @@ Ext.define('controller.Metrics', {
     onBuildStoreLoad: function(store, records, successful) {
         _.forEach(this.metrics, function(metric) {
             metric = Ext.create(metric, {buildDefinitions: this.buildDefinitions});
-            metric.sample(store.getRecords());
+            metric.sample(records);
 
             this.getMetricStore().add(Ext.create('data.model.Metric', {
                 description: metric.getDescription(),
